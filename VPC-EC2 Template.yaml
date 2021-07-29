@@ -1,0 +1,115 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description:
+  Creating a VPC with public subnet and deploying an EC2 Instance in it.
+
+Parameters:
+
+  MyVPC:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: Enter CIDR  
+       
+  PublicSubnet:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: public subnet
+
+  EC2InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues: [t2.micro, t2.nano, m1.small]
+    Description: Type your Instance
+
+  EC2AMIInstance:
+    Type: String
+    Default: ami-04db49c0fb2215364
+    Description: Amazon Linux
+
+Resources:
+   
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: !Ref MyVPC
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags: 
+        - Key: Name
+          Value: MyVPC
+         
+  myInternetGateway:   
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: IGW
+
+  myVpcIgwAttachment: 
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref myInternetGateway
+      VpcId: !Ref myVPC
+
+
+  mySubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref myVPC
+      CidrBlock: !Ref PublicSubnet
+      AvailabilityZone: "ap-south-1a"
+      Tags:
+       - Key: Name
+         Value: PublicSubnet
+        
+  myRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+      - Key: Name
+        Value: production   
+
+
+  myRoute:
+    Type: AWS::EC2::Route
+    DependsOn: myInternetGateway
+    Properties:
+       RouteTableId: !Ref myRouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId:
+         Ref: myInternetGateway
+
+  mySubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref mySubnet
+      RouteTableId: !Ref myRouteTable
+
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref EC2AMIInstance
+      SubnetId: !Ref mySubnet
+      InstanceType: !Ref EC2InstanceType
+      Tags:
+      - Key: Name
+        Value: myEC2Instance
+
+Outputs:
+
+   InstanceId:
+     Description: InstanceId of the newly created EC2 instance
+     Value: !Ref MyEC2Instance
+   AZ:
+     Description: Availability Zone of the newly created EC2 instance
+     Value: !GetAtt MyEC2Instance.AvailabilityZone
+   PublicDNS:
+     Description: Public DNSName of the newly created EC2 instance
+     Value: !GetAtt MyEC2Instance.PublicDnsName
+   PublicIP:
+     Description: Public IP address of the newly created EC2 instance
+     Value: !GetAtt MyEC2Instance.PublicIp
